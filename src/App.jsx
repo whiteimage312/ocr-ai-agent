@@ -54,7 +54,7 @@ function App() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+          Authorization: `Bearer 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`,
         },
         body: JSON.stringify({
           model: "gpt-4-vision-preview",
@@ -125,3 +125,4 @@ function App() {
 }
 
 export default App;
+
