@@ -18,7 +18,7 @@ const App = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer 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`, // pune cheia ta aici
+            Authorization: `Bearer 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`, // pune cheia ta aici
           },
           body: JSON.stringify({
             model: "gpt-4-vision-preview",
@@ -127,3 +127,4 @@ const App = () => {
 };
 
 export default App;
+
