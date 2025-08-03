@@ -57,7 +57,7 @@ function App() {
                 {
                   type: "image_url",
                   image_url: {
-                    url: image,
+                    url: "https://whiteimage.biz/whiteimage/20250707_112841.jpg"  // Aici trebuie să pui URL public la poza ta
                   },
                 },
               ],
@@ -103,3 +103,4 @@ function App() {
 }
 
 export default App;
+
