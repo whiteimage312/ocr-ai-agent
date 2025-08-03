@@ -1,88 +1,110 @@
-import React, { useState } from 'react';
-import Tesseract from 'tesseract.js';
+import React, { useState } from "react";
 
-export default function OCRChatApp() {
+const App = () => {
   const [image, setImage] = useState(null);
-  const [ocrText, setOcrText] = useState("");
-  const [question, setQuestion] = useState("");
-  const [response, setResponse] = useState("");
-  const [loadingOCR, setLoadingOCR] = useState(false);
-  const [loadingAI, setLoadingAI] = useState(false);
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
-    setImage(file);
-    setOcrText("");
-    setResponse("");
+    if (!file) return;
+
+    setImage(URL.createObjectURL(file));
+    sendImageToOpenAI(file);
   };
 
-  const runOCR = async () => {
-    if (!image) return;
-    setLoadingOCR(true);
-    const { data } = await Tesseract.recognize(image, 'eng+ron');
-    setOcrText(data.text);
-    setLoadingOCR(false);
-  };
+  const sendImageToOpenAI = async (file) => {
+    setLoading(true);
+    setText("");
 
-  const askAI = async () => {
-    if (!ocrText || !question) return;
-    setLoadingAI(true);
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Image = reader.result.split(",")[1];
 
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer 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`
-      },
-      body: JSON.stringify({
-        model: "gpt-4",
-        messages: [
-          { role: "system", content: "Extrage insighturi din textul extras cu OCR." },
-          { role: "user", content: `Textul extras: ${ocrText}` },
-          { role: "user", content: question }
-        ]
-      })
-    });
+      try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer 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`,
+          },
+          body: JSON.stringify({
+            model: "gpt-4-vision-preview",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:image/jpeg;base64,${base64Image}`,
+                    },
+                  },
+                  {
+                    type: "text",
+                    text: "Extrage tot textul din această imagine.",
+                  },
+                ],
+              },
+            ],
+            max_tokens: 1000,
+          }),
+        });
 
-    const data = await res.json();
-    setResponse(data.choices?.[0]?.message?.content || "Eroare AI.");
-    setLoadingAI(false);
+        const data = await response.json();
+        const extractedText = data.choices?.[0]?.message?.content || "Niciun text găsit.";
+        setText(extractedText);
+      } catch (err) {
+        console.error("Eroare la trimiterea către OpenAI:", err);
+        setText("A apărut o eroare.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    reader.readAsDataURL(file);
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto space-y-4">
-      <h1 className="text-xl font-bold">OCR + AI Assistant</h1>
+    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
+      <h1>OCR AI Agent</h1>
 
-      <input type="file" accept="image/*" onChange={handleImageUpload} className="block" />
+      <div style={{ marginBottom: "15px" }}>
+        <label>
+          <strong>Alege din galerie:</strong>
+          <input type="file" accept="image/*" onChange={handleImageUpload} />
+        </label>
+      </div>
 
-      <button onClick={runOCR} disabled={loadingOCR || !image} className="bg-blue-500 text-white px-4 py-2 rounded">
-        {loadingOCR ? "Extrage text..." : "Rulează OCR"}
-      </button>
-
-      {ocrText && (
-        <textarea className="w-full h-40 border rounded p-2" value={ocrText} readOnly />
-      )}
-
-      {ocrText && (
-        <div className="space-y-2">
-          <textarea
-            placeholder="Întreabă ceva despre textul extras..."
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            className="w-full h-24 border rounded p-2"
+      <div style={{ marginBottom: "15px" }}>
+        <label>
+          <strong>Fă o poză cu camera:</strong>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleImageUpload}
           />
-          <button onClick={askAI} disabled={loadingAI} className="bg-green-500 text-white px-4 py-2 rounded">
-            {loadingAI ? "Răspund..." : "Întreabă AI"}
-          </button>
+        </label>
+      </div>
+
+      {image && (
+        <div>
+          <h3>Previzualizare imagine:</h3>
+          <img src={image} alt="Imagine selectată" style={{ maxWidth: "100%", marginBottom: "20px" }} />
         </div>
       )}
 
-      {response && (
-        <div className="bg-gray-100 p-3 rounded-xl">
-          <strong>Răspuns AI:</strong>
-          <p>{response}</p>
+      {loading && <p>Se procesează imaginea...</p>}
+
+      {text && (
+        <div>
+          <h3>Text extras:</h3>
+          <pre style={{ whiteSpace: "pre-wrap" }}>{text}</pre>
         </div>
       )}
     </div>
   );
-}
+};
+
+export default App;
