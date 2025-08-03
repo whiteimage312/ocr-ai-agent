@@ -1,9 +1,8 @@
-// Acesta este codul complet pentru fisierul src/App.jsx
-
 import React, { useState } from "react";
 
 function App() {
-  const [image, setImage] = useState(null);
+  // Pornim cu imaginea fixă setată ca implicită
+  const [image, setImage] = useState("https://whiteimage.biz/whiteimage/20250707_112841.jpg");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -11,7 +10,7 @@ function App() {
     const file = e.target.files[0];
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImage(reader.result);
+      setImage(reader.result); // imagine locală în base64
     };
     if (file) {
       reader.readAsDataURL(file);
@@ -22,7 +21,7 @@ function App() {
     const file = e.target.files[0];
     const reader = new FileReader();
     reader.onloadend = () => {
-      setImage(reader.result);
+      setImage(reader.result); // imagine locală în base64
     };
     if (file) {
       reader.readAsDataURL(file);
@@ -35,8 +34,21 @@ function App() {
     setResult("Procesare imagine...");
 
     try {
-      console.log("Trimitem imagine cu lungimea:", image.length);
-      console.log("Primele caractere din imagine:", image.slice(0, 100));
+      // Verificăm dacă image este URL sau base64
+      let imageUrlForAPI = "";
+      if (image.startsWith("http")) {
+        // imagine URL public, trimitem direct linkul
+        imageUrlForAPI = image;
+      } else if (image.startsWith("data:image")) {
+        // imagine base64 - **ATENȚIE** OpenAI nu acceptă base64 în image_url, deci trebuie încărcată undeva online
+        setResult("Imaginea este locală (base64). Pentru OCR, încarcă imaginea pe un URL public.");
+        setLoading(false);
+        return;
+      } else {
+        setResult("Formatul imaginii nu este suportat.");
+        setLoading(false);
+        return;
+      }
 
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -57,7 +69,7 @@ function App() {
                 {
                   type: "image_url",
                   image_url: {
-                    url: "https://whiteimage.biz/whiteimage/20250707_112841.jpg"  // Aici trebuie să pui URL public la poza ta
+                    url: imageUrlForAPI,
                   },
                 },
               ],
@@ -86,21 +98,30 @@ function App() {
   return (
     <div style={{ padding: 20, fontFamily: "Arial" }}>
       <h1>OCR AI Agent</h1>
+
+      <div>
+        <h3>Imagine curentă:</h3>
+        {image && <img src={image} alt="upload" style={{ maxWidth: "100%", maxHeight: 400 }} />}
+      </div>
+
+      <br />
+
       <input type="file" accept="image/*" onChange={handleImageUpload} />
-      <br /><br />
+      <br />
       <input type="file" accept="image/*" capture="environment" onChange={handleCapture} />
-      <br /><br />
-      {image && <img src={image} alt="upload" style={{ maxWidth: "100%" }} />}
+
       <br /><br />
       <button onClick={extractText} disabled={loading}>
         {loading ? "Extrage text..." : "Extrage text"}
       </button>
+
       <br /><br />
-      <div><strong>Rezultat:</strong></div>
+      <div>
+        <strong>Rezultat:</strong>
+      </div>
       <pre>{result}</pre>
     </div>
   );
 }
 
 export default App;
-
