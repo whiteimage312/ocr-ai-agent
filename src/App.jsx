@@ -18,8 +18,7 @@ const App = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer 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`, // pune cheia ta aici
-          },
+            Authorization: Bearer ${process.env.REACT_APP_OPENAI_API_KEY},
           body: JSON.stringify({
             model: "gpt-4-vision-preview",
             messages: [
@@ -127,4 +126,5 @@ const App = () => {
 };
 
 export default App;
+
 
