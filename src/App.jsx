@@ -5,67 +5,82 @@ const App = () => {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const extractText = async (file) => {
+    setLoading(true);
+    setText("");
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64Image = reader.result.split(",")[1];
+
+      try {
+        // Pentru testare cu poza fixă, debifează următoarea linie și comentează următoarea:
+        // const imageUrl = "https://ocr.space/Content/Images/receipt-ocr-original.jpg";
+        const imageUrl = file
+          ? `data:image/jpeg;base64,${base64Image}`
+          : "https://ocr.space/Content/Images/receipt-ocr-original.jpg";
+
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer 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`, // pune cheia ta aici
+          },
+          body: JSON.stringify({
+            model: "gpt-4-vision-preview",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: "Te rog să recunoști tot textul scris în această imagine, indiferent cât de mic sau greu de citit, și să îl returnezi exact.",
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: imageUrl,
+                    },
+                  },
+                ],
+              },
+            ],
+            max_tokens: 1000,
+          }),
+        });
+
+        const data = await response.json();
+        console.log("OpenAI response:", data);
+
+        const output = data?.choices?.[0]?.message?.content;
+        if (output) {
+          setText(output);
+        } else {
+          setText("⚠️ Nu s-a detectat niciun text. Încearcă o imagine mai clară.");
+        }
+      } catch (error) {
+        console.error(error);
+        setText("A apărut o eroare. Verifică consola pentru detalii.");
+      }
+
+      setLoading(false);
+    };
+
+    if (file) {
+      reader.readAsDataURL(file);
+    } else {
+      // Dacă vrei să testezi poza fixă fără fișier:
+      // setText("Test poza fixă în curs...");
+      // extractText(null);
+    }
+  };
+
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImage(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const extractText = async () => {
-    if (!image) {
-      alert("Selectează o imagine mai întâi.");
-      return;
-    }
-
-    setLoading(true);
-    setText("");
-
-    try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer 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`, // înlocuiește cu cheia ta reală
-        },
-        body: JSON.stringify({
-          model: "gpt-4-vision-preview",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "Extrage tot textul vizibil din această imagine." },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: image,
-                  },
-                },
-              ],
-            },
-          ],
-          max_tokens: 1000,
-        }),
-      });
-
-      const data = await response.json();
-
-      const output = data?.choices?.[0]?.message?.content;
-      if (output) {
-        setText(output);
-      } else {
-        setText("⚠️ Nu s-a detectat niciun text. Încearcă o imagine mai clară.");
-      }
-    } catch (error) {
-      console.error(error);
-      setText("A apărut o eroare. Verifică consola pentru detalii.");
-    }
-
-    setLoading(false);
+    setImage(URL.createObjectURL(file));
+    extractText(file);
   };
 
   return (
@@ -100,13 +115,10 @@ const App = () => {
       {image && (
         <div style={{ marginBottom: 20 }}>
           <img src={image} alt="Preview" style={{ maxWidth: "100%", borderRadius: 8 }} />
-          <div>
-            <button onClick={extractText} disabled={loading}>
-              {loading ? "Se procesează..." : "Extrage text"}
-            </button>
-          </div>
         </div>
       )}
+
+      {loading && <p>Se procesează imaginea...</p>}
 
       {text && (
         <div style={{ marginTop: 20, textAlign: "left", whiteSpace: "pre-wrap" }}>
@@ -119,4 +131,3 @@ const App = () => {
 };
 
 export default App;
-
