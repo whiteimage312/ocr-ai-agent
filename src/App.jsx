@@ -1,131 +1,122 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 
-const App = () => {
-  const [image, setImage] = useState(null);
-  const [text, setText] = useState("");
+function App() {
+  const [imageData, setImageData] = useState(null);
+  const [textResult, setTextResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
-  const extractText = async (file) => {
-    setLoading(true);
-    setText("");
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
 
     const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64Image = reader.result.split(",")[1];
-
-      try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
-          body: JSON.stringify({
-            model: "gpt-4-vision-preview",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: "Te rog să recunoști tot textul scris în această imagine, indiferent cât de mic sau greu de citit, și să îl returnezi exact.",
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:image/jpeg;base64,${base64Image}`,
-                    },
-                  },
-                ],
-              },
-            ],
-            max_tokens: 1000,
-          }),
-        });
-
-        const data = await response.json();
-
-        // Logare pentru depanare
-        console.log("Răspuns complet de la OpenAI:", data);
-
-        if (!response.ok) {
-          setText(`Eroare API: ${data.error?.message || "Unknown error"}`);
-          setLoading(false);
-          return;
-        }
-
-        const output = data?.choices?.[0]?.message?.content;
-        if (output) {
-          setText(output);
-        } else {
-          setText("⚠️ Nu s-a detectat niciun text. Încearcă o imagine mai clară.");
-        }
-      } catch (error) {
-        console.error(error);
-        setText("A apărut o eroare. Verifică consola pentru detalii.");
-      }
-
-      setLoading(false);
+    reader.onloadend = () => {
+      setImageData(reader.result);
     };
-
     reader.readAsDataURL(file);
   };
 
-  const handleFileChange = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera access error:", err);
+    }
+  };
 
-    setImage(URL.createObjectURL(file));
-    extractText(file);
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const context = canvasRef.current.getContext("2d");
+    canvasRef.current.width = videoRef.current.videoWidth;
+    canvasRef.current.height = videoRef.current.videoHeight;
+    context.drawImage(videoRef.current, 0, 0);
+    const dataUrl = canvasRef.current.toDataURL("image/png");
+    setImageData(dataUrl);
+  };
+
+  const extractText = async () => {
+    if (!imageData) return;
+    setLoading(true);
+    setTextResult("");
+
+    try {
+      console.log("Trimitem imagine la OpenAI...");
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-4-vision-preview",
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Extrage textul din această imagine." },
+                { type: "image_url", image_url: { url: imageData } },
+              ],
+            },
+          ],
+          max_tokens: 1000,
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Răspuns API:", data);
+
+      const result =
+        data.choices?.[0]?.message?.content || "Nu s-a detectat text.";
+      setTextResult(result);
+    } catch (err) {
+      console.error("Eroare API:", err);
+      setTextResult("A apărut o eroare la extragerea textului.");
+    }
+
+    setLoading(false);
   };
 
   return (
-    <div style={{ maxWidth: 600, margin: "auto", textAlign: "center", padding: 20 }}>
-      <h2>OCR AI Agent 📸</h2>
+    <div style={{ padding: "20px", fontFamily: "Arial" }}>
+      <h1>OCR AI Agent</h1>
 
-      <input
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        style={{ display: "none" }}
-        id="fileInput"
-      />
-      <input
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileChange}
-        style={{ display: "none" }}
-        id="cameraInput"
-      />
+      <input type="file" accept="image/*" onChange={handleImageUpload} />
+      <br /><br />
 
-      <div style={{ margin: "20px 0" }}>
-        <button onClick={() => document.getElementById("fileInput").click()}>
-          Alege imagine
-        </button>{" "}
-        <button onClick={() => document.getElementById("cameraInput").click()}>
-          Fă poză cu camera
-        </button>
+      <button onClick={startCamera}>Deschide camera</button>
+      <button onClick={capturePhoto} style={{ marginLeft: "10px" }}>
+        Fă poză
+      </button>
+
+      <div style={{ marginTop: "20px" }}>
+        <video ref={videoRef} autoPlay playsInline style={{ maxWidth: "100%" }} />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
       </div>
 
-      {image && (
-        <div style={{ marginBottom: 20 }}>
-          <img src={image} alt="Preview" style={{ maxWidth: "100%", borderRadius: 8 }} />
+      {imageData && (
+        <div style={{ marginTop: "20px" }}>
+          <img src={imageData} alt="Preview" style={{ maxWidth: "100%", border: "1px solid #ccc" }} />
         </div>
       )}
 
-      {loading && <p>Se procesează imaginea...</p>}
+      <br />
+      <button onClick={extractText} disabled={loading}>
+        {loading ? "Extrage text..." : "Extrage text"}
+      </button>
 
-      {text && (
-        <div style={{ marginTop: 20, textAlign: "left", whiteSpace: "pre-wrap" }}>
-          <h4>Text extras:</h4>
-          <div>{text}</div>
+      {textResult && (
+        <div style={{ marginTop: "20px", whiteSpace: "pre-wrap" }}>
+          <h3>Text extras:</h3>
+          <p>{textResult}</p>
         </div>
       )}
     </div>
   );
-};
+}
 
 export default App;
-
-
-
