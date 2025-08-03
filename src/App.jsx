@@ -14,12 +14,6 @@ const App = () => {
       const base64Image = reader.result.split(",")[1];
 
       try {
-        // Pentru testare cu poza fixă, debifează următoarea linie și comentează următoarea:
-        // const imageUrl = "https://ocr.space/Content/Images/receipt-ocr-original.jpg";
-        const imageUrl = file
-          ? `data:image/jpeg;base64,${base64Image}`
-          : "https://ocr.space/Content/Images/receipt-ocr-original.jpg";
-
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -39,7 +33,7 @@ const App = () => {
                   {
                     type: "image_url",
                     image_url: {
-                      url: imageUrl,
+                      url: `data:image/jpeg;base64,${base64Image}`,
                     },
                   },
                 ],
@@ -50,7 +44,15 @@ const App = () => {
         });
 
         const data = await response.json();
-        console.log("OpenAI response:", data);
+
+        // Logare pentru depanare
+        console.log("Răspuns complet de la OpenAI:", data);
+
+        if (!response.ok) {
+          setText(`Eroare API: ${data.error?.message || "Unknown error"}`);
+          setLoading(false);
+          return;
+        }
 
         const output = data?.choices?.[0]?.message?.content;
         if (output) {
@@ -66,13 +68,7 @@ const App = () => {
       setLoading(false);
     };
 
-    if (file) {
-      reader.readAsDataURL(file);
-    } else {
-      // Dacă vrei să testezi poza fixă fără fișier:
-      // setText("Test poza fixă în curs...");
-      // extractText(null);
-    }
+    reader.readAsDataURL(file);
   };
 
   const handleFileChange = (event) => {
